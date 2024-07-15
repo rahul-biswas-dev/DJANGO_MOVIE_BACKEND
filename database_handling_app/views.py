@@ -5,16 +5,24 @@ from .serializer import MovieSerializer
 from rest_framework import status
 from data_fetching_app.views import FetchMovieData
 from datetime import datetime, timedelta
+from rest_framework.pagination import PageNumberPagination
 
+
+# for pagination
+class MoviePagination(PageNumberPagination):
+    page_size = 100
 
 # to get all movies from database
 class GetAllMovies(APIView):
+    pagination_class = MoviePagination
 
     def get(self, request):
         try:
-            movies = Movie.objects.all()
-            serializer = MovieSerializer(movies, many=True)
-            return Response(
+            movies = Movie.objects.all().order_by("imdb_rating")
+            paginator = self.pagination_class()
+            paginated_movies = paginator.paginate_queryset(movies, request)
+            serializer = MovieSerializer(paginated_movies, many=True)
+            return paginator.get_paginated_response(
                 {
                     "movies": serializer.data,
                     "Response": True,

@@ -6,7 +6,7 @@ from database_handling_app.models import Movie
 def read_data_from_xlsx(file_path):
     workbook = openpyxl.load_workbook(file_path)
     worksheet = workbook.active
-    headers = [cell.value for cell in worksheet[1]]  # Get the header row
+    headers = [str(cell.value) for cell in worksheet[1]]  # Convert headers to strings
     data = []
     for row in worksheet.iter_rows(min_row=2, values_only=True):
         data.append([cell for cell in row])
@@ -28,7 +28,7 @@ class Command(BaseCommand):
         Movie.objects.all().delete()
 
         # Read data from XLSX file
-        xlsx_file_path = "E:/movie_website/BACKEND/data.xlsx"
+        xlsx_file_path = "E:/movie_website/MOVIE_BACKEND_DJANGO/database_export.xlsx"
         headers, data = read_data_from_xlsx(xlsx_file_path)
 
         # Save data to the database
