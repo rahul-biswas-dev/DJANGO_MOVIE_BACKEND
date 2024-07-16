@@ -6,7 +6,12 @@ from rest_framework import status
 import requests
 import os
 from datetime import datetime
-from database_handling_app.models import Movie
+from database_handling_app.models import (
+    Movie,
+    ProductionCompany,
+    SpokenLanguage,
+    ProductionCountry,
+)
 from django.utils.dateparse import parse_datetime
 
 
@@ -134,15 +139,47 @@ class FetchMovieData(APIView):
         else:
             return None
 
-
     # data related work for database
     def save_movie_data(self, data, data_tmdb):
+
+        imdb_id = data.get("imdbID", "")
 
         # movie Logo
         logo_url = self.fetch_movie_logo(data)
 
         # Trailer
         trailer_url = self.search_movie_trailer(data)
+
+        # Handle production companies
+        production_companies = []
+        for company in data_tmdb.get("production_companies", []):
+            prod_company, _ = ProductionCompany.objects.get_or_create(
+                name=company["name"],
+                defaults={
+                    "logo_path": company.get("logo_path"),
+                    "origin_country": company.get("origin_country"),
+                    "imdb_id": imdb_id,
+                },
+            )
+            production_companies.append(prod_company)
+
+        # Handle spoken languages
+        spoken_languages = []
+        for language in data_tmdb.get("spoken_languages", []):
+            lang, _ = SpokenLanguage.objects.get_or_create(
+                iso_639_1=language["iso_639_1"],
+                defaults={"name": language["name"], "imdb_id": imdb_id},
+            )
+            spoken_languages.append(lang)
+
+        # Handle production countries
+        production_countries = []
+        for country in data_tmdb.get("production_countries", []):
+            prod_country, _ = ProductionCountry.objects.get_or_create(
+                iso_3166_1=country["iso_3166_1"],
+                defaults={"name": country["name"], "imdb_id": imdb_id},
+            )
+            production_countries.append(prod_country)
 
         # Convert released date to YYYY-MM-DD format
         released_date_str = data.get("Released", "")
@@ -214,6 +251,12 @@ class FetchMovieData(APIView):
                 original_language=data_tmdb.get("original_language", ""),
                 homepage=data_tmdb.get("homepage", ""),
             )
+
+            # Add many-to-many relationships
+            movie.production_companies.set(production_companies)
+            movie.spoken_languages.set(spoken_languages)
+            movie.production_countries.set(production_countries)
+
             return movie
         except (ValueError, IntegrityError) as e:
             print(f"Error saving movie data: {e}")

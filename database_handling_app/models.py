@@ -1,9 +1,37 @@
 from django.db import models
 
 
+class ProductionCompany(models.Model):
+    name = models.CharField(max_length=255)
+    logo_path = models.CharField(max_length=455, null=True, blank=True)
+    origin_country = models.CharField(max_length=100)
+    imdb_id = models.CharField(max_length=100, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class SpokenLanguage(models.Model):
+    iso_639_1 = models.CharField(max_length=10)
+    name = models.CharField(max_length=100)
+    imdb_id = models.CharField(max_length=100, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class ProductionCountry(models.Model):
+    iso_3166_1 = models.CharField(max_length=10)
+    name = models.CharField(max_length=100)
+    imdb_id = models.CharField(max_length=100, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Movie(models.Model):
     title = models.CharField(max_length=255)
-    year = models.CharField(max_length=5, default="Data Not Available")
+    year = models.CharField(max_length=50, default="N/A")
     released_date = models.DateField(null=True, blank=True)
     rated = models.CharField(max_length=20, default="Not Rated")
     imdb_rating = models.TextField(null=True, blank=True)
@@ -32,6 +60,12 @@ class Movie(models.Model):
     status = models.CharField(max_length=100, default="Unknown")
     original_language = models.CharField(max_length=100, default="Unknown")
     homepage = models.URLField(max_length=455, null=True, blank=True)
+
+    # ... existing fields ...
+    production_companies = models.ManyToManyField(ProductionCompany)
+    spoken_languages = models.ManyToManyField(SpokenLanguage)
+    production_countries = models.ManyToManyField(ProductionCountry)
+    # ... rest of the existing fields ...
 
     def __str__(self):
         return self.title

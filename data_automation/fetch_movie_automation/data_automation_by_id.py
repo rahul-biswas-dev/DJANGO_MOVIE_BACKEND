@@ -125,7 +125,7 @@ if __name__ == "__main__":
     base_url = "http://127.0.0.1:8000/"
 
     # Path to CSV file containing IMDb IDs
-    input_csv_file_path = r"E:/movie_website/MOVIE_BACKEND_DJANGO/data_automation/fetch_movie_automation/imdb_data.csv"
+    input_csv_file_path = r"E:/movie_website/movieHive/MOVIE_BACKEND_DJANGO/data_automation/fetch_movie_automation/imdb_data.csv"
 
     # Take input for the number of movies to process
     num_times = int(input("Enter the number of IMDb IDs to process: "))

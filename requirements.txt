@@ -25,3 +25,7 @@ zope.event==5.0
 zope.interface==6.2
 djangorestframework 
 Pillow
+psycopg2
+djongo
+pandas
+openpyxl
