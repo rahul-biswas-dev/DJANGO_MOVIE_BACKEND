@@ -29,6 +29,100 @@ class ProductionCountry(models.Model):
         return self.name
 
 
+class OriginCountry(models.Model):
+    name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.name
+
+
+class Cast(models.Model):
+    id = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=255)
+    known_for_department = models.CharField(max_length=255)
+    character = models.CharField(max_length=255)
+    profile_path = models.CharField(max_length=255, null=True, blank=True)
+    order = models.IntegerField()
+
+    def __str__(self):
+        return f"{self.name} as {self.character}"
+
+
+class Crew(models.Model):
+    id = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=255)
+    known_for_department = models.CharField(max_length=255)
+    department = models.CharField(max_length=255)
+    job = models.CharField(max_length=255)
+    profile_path = models.CharField(max_length=255, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.job}"
+
+
+class Video(models.Model):
+    iso_639_1 = models.CharField(max_length=10)
+    iso_3166_1 = models.CharField(max_length=10)
+    name = models.CharField(max_length=255)
+    key = models.CharField(max_length=50)
+    type = models.CharField(max_length=50)
+    size = models.IntegerField(null=True, blank=True)
+    official = models.BooleanField(default=False)
+    published_at = models.DateTimeField()
+
+    class Meta:
+        app_label = "database_handling_app"
+        db_table = "database_handling_app_video"
+
+    def __str__(self):
+        return self.name
+
+
+class Backdrops(models.Model):
+    aspect_ratio = models.FloatField()
+    height = models.IntegerField()
+    width = models.IntegerField()
+    iso_639_1 = models.CharField(max_length=10, default="en", null=True, blank=True)
+    file_path = models.CharField(max_length=255)
+
+    class Meta:
+        app_label = "database_handling_app"
+        db_table = "database_handling_app_backdrops"
+
+    def __str__(self):
+        return f"{self.file_path}"
+
+
+class Posters(models.Model):
+    aspect_ratio = models.FloatField()
+    height = models.IntegerField()
+    width = models.IntegerField()
+    iso_639_1 = models.CharField(max_length=10, default="en", null=True, blank=True)
+    file_path = models.CharField(max_length=255)
+
+    class Meta:
+        app_label = "database_handling_app"
+        db_table = "database_handling_app_posters"
+
+    def __str__(self):
+        return f"{self.file_path}"
+
+
+class Logos(models.Model):
+    aspect_ratio = models.FloatField()
+    height = models.IntegerField()
+    width = models.IntegerField()
+    iso_639_1 = models.CharField(max_length=10, default="en", null=True, blank=True)
+    file_path = models.CharField(max_length=255)
+
+    class Meta:
+        app_label = "database_handling_app"
+        db_table = "database_handling_app_logos"
+
+    def __str__(self):
+        return f"{self.file_path}"
+
+
 class Movie(models.Model):
     title = models.CharField(max_length=255)
     year = models.CharField(max_length=50, default="N/A")
@@ -42,12 +136,9 @@ class Movie(models.Model):
     awards = models.TextField(default="No awards available")
     language = models.CharField(max_length=100, default="N/A")
     poster_url = models.CharField(max_length=455)
-    website = models.URLField(max_length=455, null=True, blank=True)
     imdb_id = models.CharField(max_length=20)
     imdb_votes = models.IntegerField(null=True, blank=True)
     type = models.CharField(max_length=50, default="Unknown")
-    country = models.CharField(max_length=100, default="Unknown")
-    actors = models.TextField(default="Unknown")
     boxoffice = models.CharField(max_length=100, default="Unknown", null=True)
     rotten_tomatoes_rating = models.CharField(
         max_length=20, null=True, blank=True, default="N/A"
@@ -61,11 +152,23 @@ class Movie(models.Model):
     original_language = models.CharField(max_length=100, default="Unknown")
     homepage = models.URLField(max_length=455, null=True, blank=True)
 
-    # ... existing fields ...
     production_companies = models.ManyToManyField(ProductionCompany)
     spoken_languages = models.ManyToManyField(SpokenLanguage)
     production_countries = models.ManyToManyField(ProductionCountry)
-    # ... rest of the existing fields ...
+    origin_countries = models.ManyToManyField(OriginCountry)
+    cast = models.ManyToManyField(Cast)
+    crew = models.ManyToManyField(Crew)
+    videos = models.ManyToManyField(Video)
 
     def __str__(self):
         return self.title
+
+
+class Images(models.Model):
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name="images")
+    logos = models.ManyToManyField(Logos)
+    posters = models.ManyToManyField(Posters)
+    backdrops = models.ManyToManyField(Backdrops)
+
+    def __str__(self):
+        return f"Images for {self.movie.title}"

@@ -5,12 +5,21 @@ from rest_framework.response import Response
 from rest_framework import status
 import requests
 import os
+from django.db import transaction
 from datetime import datetime
 from database_handling_app.models import (
     Movie,
     ProductionCompany,
     SpokenLanguage,
     ProductionCountry,
+    Cast,
+    Crew,
+    Video,
+    Backdrops,
+    Posters,
+    Logos,
+    OriginCountry,
+    Images,
 )
 from django.utils.dateparse import parse_datetime
 
@@ -114,8 +123,7 @@ class FetchMovieData(APIView):
             print(f"Error parsing JSON response from TMDB: {e}")
             return None
 
-    # fetch trailer url from tmdb api
-    def search_movie_trailer(self, data):
+    def fetch_videos(self, data):
         movie_id = data.get("imdbID", "")
         api_key = os.getenv("TMDB_KEY")
         url = f"https://api.themoviedb.org/3/movie/{movie_id}/videos?api_key={api_key}"
@@ -123,32 +131,163 @@ class FetchMovieData(APIView):
         response = requests.get(url)
         data = response.json()
 
+        trailer_keys = []
         for video in data.get("results", []):
-            if video["type"] == "Trailer" and video["site"] == "YouTube":
-                return f"{video['key']}"
+            video_info = {
+                "iso_639_1": video.get("iso_639_1"),
+                "iso_3166_1": video.get("iso_3166_1"),
+                "name": video.get("name"),
+                "key": video.get("key"),
+                "type": video.get("type"),
+                "size": video.get("size"),
+                "official": video.get("official"),
+                "published_at": video.get("published_at"),
+            }
+            trailer_keys.append(video_info)
 
-    # fetch movie logo from tmdb
-    def fetch_movie_logo(self, data):
+        return trailer_keys
+
+    def fetch_logos(self, data):
         imdb_id = data.get("imdbID", "")
-        url = IMG_PATTERN.format(imdbid=imdb_id, key=KEY)
+        api_key = os.getenv("TMDB_KEY2")
+        url = f"https://api.themoviedb.org/3/movie/{imdb_id}/images?api_key={api_key}"
+
         response = requests.get(url)
-        logos = [logo for logo in response.json()["logos"] if logo["iso_639_1"] == "en"]
-        if logos:
-            logo_url = f"{logos[0]['file_path']}"
-            return logo_url
-        else:
-            return None
+        data = response.json()
+
+        logos = []
+        for logo in data.get("logos", []):
+            logos.append(
+                {
+                    "file_path": logo["file_path"],
+                    "aspect_ratio": logo.get("aspect_ratio", 1.0),
+                    "height": logo.get("height", 1080),
+                    "width": logo.get("width", 1920),
+                    "iso_639_1": logo.get("iso_639_1", "en"),
+                }
+            )
+
+        return logos
+
+    def fetch_backdrops(self, data):
+        movie_id = data.get("imdbID", "")
+        api_key = os.getenv("TMDB_KEY2")
+        url = f"https://api.themoviedb.org/3/movie/{movie_id}/images?api_key={api_key}"
+
+        response = requests.get(url)
+        data = response.json()
+
+        backdrops = []
+        for backdrop in data.get("backdrops", []):
+            backdrops.append(
+                {
+                    "file_path": backdrop["file_path"],
+                    "aspect_ratio": backdrop.get("aspect_ratio", 1.0),
+                    "height": backdrop.get("height", 1080),
+                    "width": backdrop.get("width", 1920),
+                    "iso_639_1": backdrop.get("iso_639_1", "en"),
+                }
+            )
+
+        return backdrops
+
+    def fetch_posters(self, data):
+        movie_id = data.get("imdbID", "")
+        api_key = os.getenv("TMDB_KEY2")
+        url = f"https://api.themoviedb.org/3/movie/{movie_id}/images?api_key={api_key}"
+
+        response = requests.get(url)
+        data = response.json()
+
+        posters = []
+        for poster in data.get("posters", []):
+            posters.append(
+                {
+                    "file_path": poster["file_path"],
+                    "aspect_ratio": poster.get("aspect_ratio", 1.0),
+                    "height": poster.get("height", 1080),
+                    "width": poster.get("width", 1920),
+                    "iso_639_1": poster.get("iso_639_1", "en"),
+                }
+            )
+
+        return posters
+
+    def fetch_cast(self, data):
+        movie_id = data.get("imdbID", "")
+        api_key = os.getenv("TMDB_KEY2")
+        url = f"https://api.themoviedb.org/3/movie/{movie_id}/credits?api_key={api_key}"
+
+        response = requests.get(url)
+        data = response.json()
+
+        cast = []
+        for cast_member in data.get("cast", []):
+            cast_member_data = {
+                "id": cast_member["id"],
+                "name": cast_member["name"],
+                "known_for_department": cast_member["known_for_department"],
+                "character": cast_member["character"],
+                "profile_path": cast_member["profile_path"],
+                "order": cast_member["order"],
+            }
+            cast.append(cast_member_data)
+        return cast
+
+    def fetch_crew(self, data):
+        movie_id = data.get("imdbID", "")
+        api_key = os.getenv("TMDB_KEY2")
+        url = f"https://api.themoviedb.org/3/movie/{movie_id}/credits?api_key={api_key}"
+
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+            crew = []
+            for crew_member in data.get("crew", []):
+                crew_member_data = {
+                    "id": crew_member["id"],
+                    "name": crew_member["name"],
+                    "known_for_department": crew_member["known_for_department"],
+                    "department": crew_member.get("department"),
+                    "profile_path": crew_member["profile_path"],
+                    "job": crew_member["job"],
+                }
+                crew.append(crew_member_data)
+            return crew
+        except requests.RequestException as e:
+            print(f"Error fetching crew data: {e}")
+            return []
+
+    def fetch_country(self, data_tmdb):
+        country = data_tmdb.get("origin_country", [])
+
+        country_list = []
+        for c in country:
+            country_list.append(c["name"])
+
+        return country_list
 
     # data related work for database
+    @transaction.atomic
     def save_movie_data(self, data, data_tmdb):
 
         imdb_id = data.get("imdbID", "")
 
-        # movie Logo
-        logo_url = self.fetch_movie_logo(data)
+        # handel single trailer key
+        trailer = self.fetch_videos(data)
+        for video in trailer:
+            if video["type"] == "Trailer" and video["type"] == "Trailer":
+                trailer_url = video["key"]
 
-        # Trailer
-        trailer_url = self.search_movie_trailer(data)
+                break
+
+        # handel single logo url
+        logo = self.fetch_logos(data)
+        for l in logo:
+            if l["iso_639_1"] == "en":
+                logo_url = l["file_path"]
+                break
 
         # Handle production companies
         production_companies = []
@@ -236,11 +375,9 @@ class FetchMovieData(APIView):
                 awards=data.get("Awards", ""),
                 language=data.get("Language", ""),
                 poster_url=data_tmdb.get("poster_path", ""),
-                website=data.get("Website", ""),
                 imdb_id=data.get("imdbID", ""),
                 imdb_votes=imdb_votes,
                 type=data.get("Type", ""),
-                actors=data.get("Actors", ""),
                 boxoffice=data.get("BoxOffice", ""),
                 rotten_tomatoes_rating=rotten_tomatoes_rating,
                 runtime=data.get("Runtime", ""),
@@ -252,27 +389,96 @@ class FetchMovieData(APIView):
                 homepage=data_tmdb.get("homepage", ""),
             )
 
+            # Create the Images object
+            images = Images.objects.create(movie=movie)
+
             # Add many-to-many relationships
             movie.production_companies.set(production_companies)
             movie.spoken_languages.set(spoken_languages)
             movie.production_countries.set(production_countries)
 
+            # Handel origin country
+            origin_countries = []
+            for country in data_tmdb.get("production_countries", []):
+                origin_country, _ = OriginCountry.objects.get_or_create(
+                    name=country["name"]
+                )
+                origin_countries.append(origin_country)
+            movie.origin_countries.set(origin_countries)
+
+            # Handle crew
+            crew = self.fetch_crew(data)
+            if crew:
+                crew_objects = [Crew(**member) for member in crew]
+                Crew.objects.bulk_create(crew_objects, ignore_conflicts=True)
+                movie.crew.set(crew_objects)
+
+            # Handle cast
+            cast = self.fetch_cast(data)
+            if cast:
+                cast_objects = [Cast(**member) for member in cast]
+                Cast.objects.bulk_create(cast_objects, ignore_conflicts=True)
+                movie.cast.set(cast_objects)
+
+            # Handle videos
+            videos = self.fetch_videos(data)
+            if videos:
+                video_objects = []
+                for video_data in videos:
+                    video, created = Video.objects.get_or_create(
+                        key=video_data["key"], defaults=video_data
+                    )
+                    video_objects.append(video)
+                movie.videos.set(video_objects)
+
+            # Handle logos, backdrops, and posters
+            logos_data = self.fetch_logos(data)
+            backdrops_data = self.fetch_backdrops(data)
+            posters_data = self.fetch_posters(data)
+
+            if logos_data:
+                logo_objects = [
+                    Logos.objects.create(
+                        iso_639_1=item.get("iso_639_1", "en"),
+                        **{k: v for k, v in item.items() if k != "iso_639_1"},
+                    )
+                    for item in logos_data
+                ]
+
+                images.logos.set(logo_objects)
+
+            if backdrops_data:
+                backdrop_objects = [
+                    Backdrops.objects.create(**item) for item in backdrops_data
+                ]
+                images.backdrops.set(backdrop_objects)
+
+            if posters_data:
+                poster_objects = [
+                    Posters.objects.create(**item) for item in posters_data
+                ]
+                images.posters.set(poster_objects)
+
             return movie
+
         except (ValueError, IntegrityError) as e:
             print(f"Error saving movie data: {e}")
             return None
 
     # function to save the data to database
     def get(self, request, imdb_id):
-        data = self.fetch_movie_data(imdb_id)
-        data_tmdb = self.fetch_movie_data_tmdb(imdb_id)
-        if data and data_tmdb:
-            self.save_movie_data(data, data_tmdb)
-            return JsonResponse(
-                {"message": f"Movie {imdb_id} saved successfully"}, status=200
-            )
-        else:
-            return JsonResponse({"message": "Failed to fetch data"}, status=400)
+        try:
+            data = self.fetch_movie_data(imdb_id)
+            data_tmdb = self.fetch_movie_data_tmdb(imdb_id)
+            if data and data_tmdb:
+                self.save_movie_data(data, data_tmdb)
+                return JsonResponse(
+                    {"message": f"Movie {imdb_id} saved successfully"}, status=200
+                )
+            else:
+                return JsonResponse({"message": "Failed to fetch data"}, status=400)
+        except Exception as e:
+            return JsonResponse({"message": f"An error occurred: {str(e)}"}, status=500)
 
 
 # this fetch data by title from omdb website
@@ -327,33 +533,7 @@ class FetchUpcomingMovies(APIView):
         if response.status_code == 200:
             data = response.json()
             return Response(data, status=status.HTTP_200_OK)
-            # for movie in data["results"]:
-            #     adult = movie["adult"]
-            #     # genre_ids = movie["genre_ids"]
-            #     id = movie["id"]
-            #     title = movie["title"]
-            #     backdrop_path = movie["backdrop_path"]
-            #     poster_path = movie["poster_path"]
-            #     release_date = movie["release_date"]
-            #     overview = movie["overview"]
-            #     original_language = movie["original_language"]
-            #     popularity = movie["popularity"]
-            #     vote_count = movie["vote_count"]
-            #     return Response(
-            #         {
-            #             "title": title,
-            #             "release_date": release_date,
-            #             "overview": overview,
-            #             "backdrop_path": backdrop_path,
-            #             "adult": adult,
-            #             "id": id,
-            #             "poster_path": poster_path,
-            #             "original_language": original_language,
-            #             "popularity": popularity,
-            #             "vote_count": vote_count,
-            #         },
-            #         status=status.HTTP_200_OK,
-            #     )
+
         else:
             return Response(
                 {"message": "Failed to fetch data"}, status=status.HTTP_400_BAD_REQUEST
@@ -391,33 +571,7 @@ class FetchUpcomingTvShow(APIView):
         if response.status_code == 200:
             data = response.json()
             return Response(data, status=status.HTTP_200_OK)
-            # for movie in data["results"]:
-            #     adult = movie["adult"]
-            #     # genre_ids = movie["genre_ids"]
-            #     id = movie["id"]
-            #     title = movie["title"]
-            #     backdrop_path = movie["backdrop_path"]
-            #     poster_path = movie["poster_path"]
-            #     release_date = movie["release_date"]
-            #     overview = movie["overview"]
-            #     original_language = movie["original_language"]
-            #     popularity = movie["popularity"]
-            #     vote_count = movie["vote_count"]
-            #     return Response(
-            #         {
-            #             "title": title,
-            #             "release_date": release_date,
-            #             "overview": overview,
-            #             "backdrop_path": backdrop_path,
-            #             "adult": adult,
-            #             "id": id,
-            #             "poster_path": poster_path,
-            #             "original_language": original_language,
-            #             "popularity": popularity,
-            #             "vote_count": vote_count,
-            #         },
-            #         status=status.HTTP_200_OK,
-            #     )
+
         else:
             return Response(
                 {"message": "Failed to fetch data"}, status=status.HTTP_400_BAD_REQUEST
