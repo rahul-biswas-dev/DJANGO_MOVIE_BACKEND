@@ -1,8 +1,11 @@
-from rest_framework.response import Response
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
+
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
 from .models import Movie
 from .serializer import MovieSerializer
-from rest_framework import status
 from data_fetching_app.views import FetchMovieData
 from datetime import datetime, timedelta
 from rest_framework.pagination import PageNumberPagination
@@ -12,10 +15,12 @@ from rest_framework.pagination import PageNumberPagination
 class MoviePagination(PageNumberPagination):
     page_size = 100
 
+
 # to get all movies from database
 class GetAllMovies(APIView):
     pagination_class = MoviePagination
 
+    @method_decorator(ratelimit(key="ip", rate="1000/m", method="GET"))
     def get(self, request):
         try:
             movies = Movie.objects.all().order_by("imdb_rating")
@@ -63,6 +68,8 @@ class CheckMovieExistence(APIView):
 
 # this returns a single movie data by imdbid
 class SingleMovie(APIView):
+
+    @method_decorator(ratelimit(key="ip", rate="1000/m", method="GET", group="per_day"))
     def get(self, request, imdb_id=None):
         # Check if the movie exists in the database
         existence_response = CheckMovieExistence().get(request, imdb_id)
@@ -95,6 +102,8 @@ class SingleMovie(APIView):
 
 # newly released movies past 6 months
 class NewReleasedSixMonth(APIView):
+
+    @method_decorator(ratelimit(key="ip", rate="2/m", method="GET", block=True))
     def get(self, request):
 
         try:
