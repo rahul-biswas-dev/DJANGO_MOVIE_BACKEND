@@ -26,6 +26,8 @@ API_KEY_FETCH4 = os.getenv("API_KEY_FETCH4")
 API_KEY_FETCH4 = os.getenv("API_KEY_FETCH5")
 API_KEY_FETCH4 = os.getenv("API_KEY_FETCH6")
 
+API_KEY = os.getenv("API_KEY")
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -59,7 +61,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "database_handling_app.middleware.RatelimitMiddleware",
+    "database_handling_app.api_rate_limit_middleware.RatelimitMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -73,7 +75,7 @@ MIDDLEWARE = [
 
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
-    "EXCEPTION_HANDLER": "database_handling_app.middleware.custom_exception_handler",
+    "EXCEPTION_HANDLER": "database_handling_app.api_rate_limit_middleware.custom_exception_handler",
 }
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -173,21 +175,3 @@ CACHES = {
     },
 }
 RATELIMIT_USE_CACHE = "ratelimit"
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "file": {
-            "level": "DEBUG",
-            "class": "logging.FileHandler",
-            "filename": "debug.log",
-        },
-    },
-    "loggers": {
-        "django": {
-            "handlers": ["file"],
-            "level": "DEBUG",
-            "propagate": True,
-        },
-    },
-}

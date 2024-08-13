@@ -1,5 +1,6 @@
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
+from .api_auth_middleware import api_key_required
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -20,6 +21,7 @@ class MoviePagination(PageNumberPagination):
 class GetAllMovies(APIView):
     pagination_class = MoviePagination
 
+    @method_decorator(api_key_required, name="dispatch")
     @method_decorator(ratelimit(key="ip", rate="1000/m", method="GET"))
     def get(self, request):
         try:
@@ -69,7 +71,8 @@ class CheckMovieExistence(APIView):
 # this returns a single movie data by imdbid
 class SingleMovie(APIView):
 
-    @method_decorator(ratelimit(key="ip", rate="1000/m", method="GET", group="per_day"))
+    @method_decorator(api_key_required, name="dispatch")
+    @method_decorator(ratelimit(key="ip", rate="4/m", method="GET", group="per_day"))
     def get(self, request, imdb_id=None):
         # Check if the movie exists in the database
         existence_response = CheckMovieExistence().get(request, imdb_id)
